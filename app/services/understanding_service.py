@@ -10,7 +10,10 @@ def generate_understanding(
     clone_path: str,
     project_info: dict,
     analysis_results: list[dict],
-    graph_response: dict
+    graph_response: dict,
+    provider: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None
 ) -> dict:
     """
     Orchestrator for Feature 5: AI-Powered Repository Understanding.
@@ -27,11 +30,22 @@ def generate_understanding(
 
     # Level 1: Function-level understanding
     print("--- [Feature 5] Step 1/5: Summarizing functions... ---")
-    function_summaries = summarize_functions(analysis_results)
+    function_summaries = summarize_functions(
+        analysis_results,
+        provider=provider,
+        model=model,
+        api_key=api_key
+    )
 
     # Level 2: File-level understanding
     print("--- [Feature 5] Step 2/5: Summarizing files... ---")
-    file_summaries = summarize_files(analysis_results, function_summaries)
+    file_summaries = summarize_files(
+        analysis_results,
+        function_summaries,
+        provider=provider,
+        model=model,
+        api_key=api_key
+    )
 
     # Grouping: Directory-based module detection
     print("--- [Feature 5] Step 3/5: Detecting modules... ---")
@@ -39,7 +53,13 @@ def generate_understanding(
 
     # Level 3: Module-level understanding
     print("--- [Feature 5] Step 4/5: Summarizing modules... ---")
-    module_summaries = summarize_modules(modules, file_summaries)
+    module_summaries = summarize_modules(
+        modules,
+        file_summaries,
+        provider=provider,
+        model=model,
+        api_key=api_key
+    )
 
     # Level 4: Project-level understanding
     print("--- [Feature 5] Step 5/5: Summarizing project... ---")
@@ -47,7 +67,10 @@ def generate_understanding(
         repository_name=repository_name,
         project_info=project_info,
         module_summaries=module_summaries,
-        graph_response=graph_response
+        graph_response=graph_response,
+        provider=provider,
+        model=model,
+        api_key=api_key
     )
 
     # Assemble the final repository context

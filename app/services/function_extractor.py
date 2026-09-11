@@ -4,12 +4,21 @@ from tree_sitter import Node
 FUNCTION_NODE_TYPES = {
     "Python": {
         "function_definition",
+        "async_function_definition",
     },
 
     "JavaScript": {
         "function_declaration",
         "function",
         "arrow_function",
+        "method_definition",
+    },
+
+    "TypeScript": {
+        "function_declaration",
+        "function",
+        "arrow_function",
+        "method_definition",
     },
 
     "C++": {
@@ -40,6 +49,15 @@ def extract_function_info(
                 break
             ancestor = ancestor.parent
 
+    # For method_definition where name is property_identifier
+    if name_node is None and node.type == "method_definition":
+        name_node = node.child_by_field_name("property")
+        if name_node is None:
+            for child in node.named_children:
+                if child.type in ("property_identifier", "identifier"):
+                    name_node = child
+                    break
+
     if name_node is None:
         return None
 
@@ -58,12 +76,12 @@ def extract_function_info(
             parameters.append(parameter_name)
 
     return {
-    "name": name,
-    "language": language,
-    "parameters": parameters,
-    "line": node.start_point[0] + 1,
-    "end_line": node.end_point[0] + 1,
-}
+        "name": name,
+        "language": language,
+        "parameters": parameters,
+        "line": node.start_point[0] + 1,
+        "end_line": node.end_point[0] + 1,
+    }
 
 
 def extract_functions(

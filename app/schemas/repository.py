@@ -30,4 +30,7 @@ class RepositoryAnalysisResponse(BaseModel):
     project_info: ProjectInfo
     clone_path: str
     total_source_files: int         
-    source_files: list[str]   
+    source_files: list[str]
+    files: list[dict] = []
+    total_functions: int = 0
+    total_classes: int = 0   

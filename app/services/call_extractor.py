@@ -26,18 +26,21 @@ CALL_NODE_TYPES = {
 FUNCTION_NODE_TYPES = {
     "Python": {
         "function_definition",
+        "async_function_definition",
     },
 
     "JavaScript": {
         "function_declaration",
         "function",
         "arrow_function",
+        "method_definition",
     },
 
     "TypeScript": {
         "function_declaration",
         "function",
         "arrow_function",
+        "method_definition",
     },
 
     "C++": {
@@ -88,6 +91,15 @@ def extract_function_calls(
                         break
                     ancestor = ancestor.parent
 
+            # For method_definition where name is property_identifier
+            if name_node is None and node.type == "method_definition":
+                name_node = node.child_by_field_name("property")
+                if name_node is None:
+                    for child in node.named_children:
+                        if child.type in ("property_identifier", "identifier"):
+                            name_node = child
+                            break
+
             if name_node:
                 current_function = (
                     name_node.text.decode("utf-8")
@@ -105,8 +117,8 @@ def extract_function_calls(
                     "utf-8"
                 )
 
-                # For member expressions like "User.findById",
-                # extract just the method name "findById"
+                # For member expressions like "User.findById" or "self.save",
+                # extract just the method name "findById" / "save"
                 if "." in callee:
                     callee = callee.split(".")[-1]
 

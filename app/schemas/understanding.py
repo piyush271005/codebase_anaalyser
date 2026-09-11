@@ -34,6 +34,9 @@ class ProjectSummary(BaseModel):
 
 class UnderstandingRequest(BaseModel):
     repo_url: str
+    provider: str | None = None
+    model: str | None = None
+    api_key: str | None = None
 
 
 class UnderstandingResponse(BaseModel):

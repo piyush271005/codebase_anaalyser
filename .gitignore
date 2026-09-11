@@ -4,5 +4,6 @@ __pycache__/
 *.pyc
 
 repositories/
+chroma_db/
 
 .env

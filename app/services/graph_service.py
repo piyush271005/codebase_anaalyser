@@ -24,7 +24,7 @@ def generate_graphs(analysis_results: list[dict]) -> dict:
     resolved_calls = resolve_function_calls(analysis_results, function_index)
 
     # Part 3: Build Function Call Graph
-    call_graph = build_function_call_graph(resolved_calls)
+    call_graph = build_function_call_graph(resolved_calls, function_index)
 
     # --- Dependency Graph Side (Parts 4-6) ---
 
@@ -35,7 +35,7 @@ def generate_graphs(analysis_results: list[dict]) -> dict:
     resolved_imports = resolve_imports(analysis_results, file_index)
 
     # Part 6: Build Dependency Graph
-    dep_graph = build_dependency_graph(resolved_imports)
+    dep_graph = build_dependency_graph(resolved_imports, analysis_results)
 
     # --- Part 7: Combine into Graph Response ---
 

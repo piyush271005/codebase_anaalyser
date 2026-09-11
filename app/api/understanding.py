@@ -66,7 +66,10 @@ def understand_repository(request: UnderstandingRequest):
         clone_path=str(clone_path),
         project_info=project_info,
         analysis_results=analysis_results,
-        graph_response=graph_response
+        graph_response=graph_response,
+        provider=request.provider,
+        model=request.model,
+        api_key=request.api_key
     )
 
     return understanding

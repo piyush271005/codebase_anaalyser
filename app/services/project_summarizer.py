@@ -5,7 +5,10 @@ def summarize_project(
     repository_name: str,
     project_info: dict,
     module_summaries: list[dict],
-    graph_response: dict
+    graph_response: dict,
+    provider: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None
 ) -> dict:
     """
     Generate the top-level project summary using module summaries,
@@ -74,19 +77,15 @@ TECHNOLOGIES: <comma-separated list>
 FEATURES: <comma-separated list>"""
 
     # 5. Call the LLM (Part 2)
-    print(f"Generating project summary for: {repository_name}...")
-    response = call_llm(prompt)
+    print(f"Generating project summary for: {repository_name} using {provider or 'default'}...")
+    response = call_llm(prompt, model=model, provider=provider, api_key=api_key)
 
     # 6. Parse the LLM response
-    if not response:
-        return {
-            "summary": "No summary available.",
-            "main_technologies": [],
-            "main_features": []
-        }
+    if not response or not response.strip():
+        raise RuntimeError(f"LLM returned empty project summary for '{repository_name}'.")
 
     # Parse the structured response
-    summary = "No summary available."
+    summary = ""
     technologies = []
     features = []
 

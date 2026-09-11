@@ -18,10 +18,11 @@ def clone_repository(repo_url: str, project_id: str) -> str:
 
     clone_path = REPOSITORIES_DIR / project_id
 
-    Repo.clone_from(
-        repo_url,
-        clone_path
-    )
+    if not clone_path.exists():
+        Repo.clone_from(
+            repo_url,
+            clone_path
+        )
 
     repository_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
     return {"project_id": project_id, "clone_path": clone_path, "repository_name": repository_name}

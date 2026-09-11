@@ -19,25 +19,19 @@ import os
 # Provider 1: Groq
 # ──────────────────────────────────────────────
 
-def call_groq(prompt: str, model: str | None = None) -> str | None:
+def call_groq(prompt: str, model: str | None = None, api_key: str | None = None, max_tokens: int = 500) -> str:
+
+    api_key = api_key or os.environ.get("GROQ_API_KEY")
+
+    if not api_key:
+        raise ValueError("Groq API key not provided. Please provide an API key or set GROQ_API_KEY.")
+
+    model = model or "groq/compound-mini"
 
     try:
         from groq import Groq
-    except ImportError:
-        print("[LLM] Error: 'groq' package not installed. Run: pip install groq")
-        return None
+        client = Groq(api_key=api_key)
 
-    api_key = os.environ.get("GROQ_API_KEY")
-
-    if not api_key:
-        print("[LLM] Error: GROQ_API_KEY not set")
-        return None
-
-    client = Groq(api_key=api_key)
-
-    model = model or "llama-3.1-8b-instant"
-
-    try:
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -46,68 +40,95 @@ def call_groq(prompt: str, model: str | None = None) -> str | None:
                     "content": prompt
                 }
             ],
-            max_tokens=500,
+            max_tokens=max_tokens,
             temperature=0.3,
         )
 
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError(f"Groq returned empty response for model '{model}'.")
+        return content
 
+    except ImportError:
+        import requests
+        try:
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens,
+                    "temperature": 0.3
+                },
+                timeout=30
+            )
+            res.raise_for_status()
+            data = res.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            raise RuntimeError(f"Groq API error ({model}): {e}")
     except Exception as e:
-        print(f"[LLM] Groq error: {e}")
-        return None
+        raise RuntimeError(f"Groq API error ({model}): {e}")
 
 
 # ──────────────────────────────────────────────
 # Provider 2: Gemini
 # ──────────────────────────────────────────────
+# Provider 2: Gemini
+# ──────────────────────────────────────────────
 
-def call_gemini(prompt: str, model: str | None = None) -> str | None:
+def call_gemini(prompt: str, model: str | None = None, api_key: str | None = None, max_tokens: int = 500) -> str:
 
     try:
         import google.generativeai as genai
     except ImportError:
-        print("[LLM] Error: 'google-generativeai' package not installed. Run: pip install google-generativeai")
-        return None
+        raise ImportError("[LLM] Error: 'google-generativeai' package not installed. Run: pip install google-generativeai")
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = api_key or os.environ.get("GEMINI_API_KEY")
 
     if not api_key:
-        print("[LLM] Error: GEMINI_API_KEY not set")
-        return None
+        raise ValueError("Gemini API key not provided. Please provide an API key or set GEMINI_API_KEY.")
 
     genai.configure(api_key=api_key)
 
-    model_name = model or "gemini-2.0-flash"
+    model_name = model or "gemini-3.5-flash-lite"
 
     try:
         gemini_model = genai.GenerativeModel(model_name)
 
-        response = gemini_model.generate_content(prompt)
+        response = gemini_model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens)
+        )
+
+        if not response.text:
+            raise RuntimeError(f"Gemini returned empty response for model '{model_name}'.")
 
         return response.text
 
     except Exception as e:
-        print(f"[LLM] Gemini error: {e}")
-        return None
+        raise RuntimeError(f"Gemini API error ({model_name}): {e}")
 
 
 # ──────────────────────────────────────────────
 # Provider 3: OpenAI (GPT)
 # ──────────────────────────────────────────────
 
-def call_openai(prompt: str, model: str | None = None) -> str | None:
+def call_openai(prompt: str, model: str | None = None, api_key: str | None = None, max_tokens: int = 500) -> str:
 
     try:
         from openai import OpenAI
     except ImportError:
-        print("[LLM] Error: 'openai' package not installed. Run: pip install openai")
-        return None
+        raise ImportError("[LLM] Error: 'openai' package not installed. Run: pip install openai")
 
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = api_key or os.environ.get("OPENAI_API_KEY")
 
     if not api_key:
-        print("[LLM] Error: OPENAI_API_KEY not set")
-        return None
+        raise ValueError("OpenAI API key not provided. Please provide an API key or set OPENAI_API_KEY.")
 
     client = OpenAI(api_key=api_key)
 
@@ -122,22 +143,25 @@ def call_openai(prompt: str, model: str | None = None) -> str | None:
                     "content": prompt
                 }
             ],
-            max_tokens=500,
+            max_tokens=max_tokens,
             temperature=0.3,
         )
 
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError(f"OpenAI returned empty response for model '{model}'.")
+
+        return content
 
     except Exception as e:
-        print(f"[LLM] OpenAI error: {e}")
-        return None
+        raise RuntimeError(f"OpenAI error ({model}): {e}")
 
 
 # ──────────────────────────────────────────────
 # Provider 4: Ollama (local)
 # ──────────────────────────────────────────────
 
-def call_ollama(prompt: str, model: str | None = None) -> str | None:
+def call_ollama(prompt: str, model: str | None = None, api_key: str | None = None, max_tokens: int = 500) -> str:
 
     import requests
 
@@ -155,17 +179,21 @@ def call_ollama(prompt: str, model: str | None = None) -> str | None:
                 "model": model,
                 "prompt": prompt,
                 "stream": False,
+                "options": {"num_predict": max_tokens},
             },
             timeout=120,
         )
 
         response.raise_for_status()
 
-        return response.json().get("response")
+        resp_text = response.json().get("response")
+        if not resp_text:
+            raise RuntimeError(f"Ollama returned empty response for model '{model}' at {base_url}.")
+
+        return resp_text
 
     except Exception as e:
-        print(f"[LLM] Ollama error: {e}")
-        return None
+        raise RuntimeError(f"Ollama error ({model} at {base_url}): {e}")
 
 
 # ──────────────────────────────────────────────
@@ -184,32 +212,30 @@ PROVIDERS = {
 # Main Function — call_llm()
 # ──────────────────────────────────────────────
 
-def call_llm(prompt: str, model: str | None = None) -> str | None:
+def call_llm(
+    prompt: str,
+    model: str | None = None,
+    provider: str | None = None,
+    api_key: str | None = None,
+    max_tokens: int = 500
+) -> str:
     """
-    Send a prompt to the configured LLM provider
-    and return the text response.
-
-    Provider is selected via the LLM_PROVIDER
-    environment variable.
-
-    Model can be overridden via the model parameter
-    or the LLM_MODEL environment variable.
-
-    Returns None if the API call fails.
+    Send a prompt to the configured LLM provider and return the text response.
+    Raises exceptions directly on any failure without silent fallbacks.
     """
 
-    provider_name = os.environ.get("LLM_PROVIDER", "groq")
+    provider_name = (provider or os.environ.get("LLM_PROVIDER", "groq")).strip().lower()
 
     provider_function = PROVIDERS.get(provider_name)
 
     if provider_function is None:
-        print(
-            f"[LLM] Unknown provider: {provider_name}. "
-            f"Available: {list(PROVIDERS.keys())}"
+        raise ValueError(
+            f"[LLM] Unknown provider: '{provider_name}'. "
+            f"Available providers: {list(PROVIDERS.keys())}"
         )
-        return None
 
-    # Model priority: parameter > env var > provider default
-    model = model or os.environ.get("LLM_MODEL")
+    # Model priority: explicit parameter > env var (only if provider not explicitly specified) > provider default
+    if not model and not provider:
+        model = os.environ.get("LLM_MODEL")
 
-    return provider_function(prompt, model)
+    return provider_function(prompt, model=model, api_key=api_key, max_tokens=max_tokens)

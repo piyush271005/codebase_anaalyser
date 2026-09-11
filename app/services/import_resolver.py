@@ -17,6 +17,12 @@ def resolve_imports(analysis_results, file_index):
             known_files[norm_full] = fp
             known_files[norm_no_ext] = fp
 
+            # If index or __init__ file, allow resolving via directory path
+            base_name = Path(fp).name
+            if base_name in ("__init__.py", "index.js", "index.jsx", "index.ts", "index.tsx"):
+                dir_posix = Path(os.path.dirname(os.path.normpath(fp))).as_posix()
+                known_files[dir_posix] = fp
+
     resolved_imports = []
 
     for file_result in analysis_results:
@@ -34,29 +40,63 @@ def resolve_imports(analysis_results, file_index):
 
             target_file = None
 
-            # 1. For relative imports (JS/TS): ./utils/auth or ../db/index
+            # 1. Relative imports
             if module_name.startswith("."):
 
                 source_dir = os.path.dirname(os.path.normpath(source_file))
-                combined = os.path.normpath(os.path.join(source_dir, module_name))
-                resolved_posix = Path(combined).as_posix()
 
-                # Try with exact extension
-                target_file = known_files.get(resolved_posix)
+                # Python relative imports: e.g. ".router", "..config", "."
+                if "/" not in module_name and "\\" not in module_name:
+                    leading_dots = len(module_name) - len(module_name.lstrip("."))
+                    remainder = module_name[leading_dots:]
 
-                # Try without extension
-                if target_file is None:
-                    no_ext = Path(combined).with_suffix("").as_posix()
-                    target_file = known_files.get(no_ext)
+                    target_dir = source_dir
+                    for _ in range(leading_dots - 1):
+                        target_dir = os.path.dirname(target_dir)
 
-                # Try adding /index (Node.js convention: import "./db" -> "./db/index.js")
-                if target_file is None:
-                    index_path = Path(os.path.join(combined, "index")).as_posix()
-                    target_file = known_files.get(index_path)
+                    if remainder:
+                        sub_parts = remainder.split(".")
+                        combined = os.path.normpath(os.path.join(target_dir, *sub_parts))
+                    else:
+                        combined = os.path.normpath(target_dir)
 
-            # 2. For Python dotted imports: try direct lookup in file_index
+                    resolved_posix = Path(combined).as_posix()
+                    target_file = known_files.get(resolved_posix)
+
+                    if target_file is None:
+                        target_file = known_files.get(Path(combined + ".py").as_posix())
+                    if target_file is None:
+                        init_path = Path(os.path.join(combined, "__init__.py")).as_posix()
+                        target_file = known_files.get(init_path)
+                    if target_file is None and remainder:
+                        target_file = file_index.get(remainder)
+
+                else:
+                    # JS/TS relative imports: ./utils/auth or ../db/index
+                    combined = os.path.normpath(os.path.join(source_dir, module_name))
+                    resolved_posix = Path(combined).as_posix()
+
+                    # Try with exact extension
+                    target_file = known_files.get(resolved_posix)
+
+                    # Try without extension
+                    if target_file is None:
+                        no_ext = Path(combined).with_suffix("").as_posix()
+                        target_file = known_files.get(no_ext)
+
+                    # Try adding /index (Node.js convention: import "./db" -> "./db/index.js")
+                    if target_file is None:
+                        index_path = Path(os.path.join(combined, "index")).as_posix()
+                        target_file = known_files.get(index_path)
+
+            # 2. Dotted module lookup in file_index
             if target_file is None:
                 target_file = file_index.get(module_name)
+
+            # 3. Fallback: Check if module_name includes an imported function/class symbol
+            if target_file is None and "." in module_name:
+                parent_module = module_name.rsplit(".", 1)[0]
+                target_file = file_index.get(parent_module)
 
             if not target_file:
                 continue
